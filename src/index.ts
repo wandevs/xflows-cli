@@ -137,6 +137,10 @@ export function printJson(data: any) {
 export const ERC20_ABI = [
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function balanceOf(address owner) view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function symbol() view returns (string)",
 ];
 
 // ── CLI definition ──────────────────────────────────────────────────────────
@@ -149,13 +153,15 @@ program
     "XFlows Cross-Chain Bridge CLI Tool\n\n" +
     "A command-line interface for Wanchain XFlows cross-chain bridge.\n" +
     "Supports wallet management, quote queries, cross-chain transactions,\n" +
-    "and all XFlows API query endpoints.\n\n" +
+    "same-chain native/ERC20 transfers, and all XFlows API query endpoints.\n\n" +
     "Wallet files are stored in ~/.xflows/wallets/\n\n" +
     "Examples:\n" +
     '  xflows wallet create --name myWallet\n' +
     '  xflows wallet create --name secureWallet --encrypt\n' +
     '  xflows chains\n' +
     '  xflows tokens --chain-id 1\n' +
+    '  xflows transfer --wallet myWallet --chain-id 1 --to 0x... --amount 0.1\n' +
+    '  xflows transfer-token --wallet myWallet --chain-id 1 --token 0x... --to 0x... --amount 100\n' +
     '  xflows quote --from-chain 1 --to-chain 56 --from-token 0x0...0 --to-token 0x0...0 --from-address 0x... --to-address 0x... --amount 1.0\n' +
     '  xflows send --wallet myWallet --from-chain 1 --to-chain 56 --from-token 0x0...0 --to-token 0x0...0 --to-address 0x... --amount 1.0\n' +
     '  xflows status --hash 0x... --from-chain 1 --to-chain 56 --from-token 0x0...0 --to-token 0x0...0 --from-address 0x... --to-address 0x... --amount 1.0'
@@ -626,6 +632,193 @@ program
 
       console.log("\nYou can track the cross-chain status with:");
       console.log(`  xflows status --hash ${sentTx.hash} --from-chain ${opts.fromChain} --to-chain ${opts.toChain} --from-token ${opts.fromToken} --to-token ${opts.toToken} --from-address ${wallet.address} --to-address ${opts.toAddress} --amount ${opts.amount}`);
+    } catch (e: any) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+  });
+
+// ── Transfer (native token, same chain) ──────────────────────────────────────
+program
+  .command("transfer")
+  .description(
+    "Send native tokens (ETH/BNB/WAN/etc.) on the same chain\n\n" +
+    "This is a simple same-chain transfer, NOT a cross-chain bridge operation.\n\n" +
+    "Examples:\n" +
+    "  # Send 0.1 ETH on Ethereum\n" +
+    "  xflows transfer --wallet alice --chain-id 1 --to 0xRecipient --amount 0.1\n\n" +
+    "  # Send 1.5 BNB on BSC with encrypted wallet\n" +
+    "  xflows transfer --wallet alice --password mysecret --chain-id 56 --to 0xRecipient --amount 1.5"
+  )
+  .requiredOption("--wallet <name>", "Wallet name to use for signing")
+  .requiredOption("--chain-id <chainId>", "Chain ID to send on")
+  .requiredOption("--to <address>", "Recipient address")
+  .requiredOption("--amount <amount>", "Amount to send (human-readable, e.g., 0.1)")
+  .option("--password <password>", "Password to decrypt encrypted wallet")
+  .option("--rpc <url>", "Custom RPC URL (overrides default)")
+  .option("--gas-limit <limit>", "Custom gas limit")
+  .option("--dry-run", "Only build the transaction, don't send it", false)
+  .action(async (opts) => {
+    try {
+      const wallet = loadWallet(opts.wallet, opts.password);
+      const provider = opts.rpc ? new JsonRpcProvider(opts.rpc) : getProvider(opts.chainId);
+      const signer = wallet.connect(provider);
+
+      const txRequest: any = {
+        to: opts.to,
+        value: parseEther(opts.amount),
+      };
+
+      if (opts.gasLimit) {
+        txRequest.gasLimit = BigInt(opts.gasLimit);
+      }
+
+      // Wanchain special handling: baseFee must be at least 1 gwei
+      const isWanchain = opts.chainId === "888";
+      if (isWanchain) {
+        const feeData = await provider.getFeeData();
+        const minBaseFee = parseUnits("1", "gwei");
+        if (feeData.gasPrice && feeData.gasPrice < minBaseFee) {
+          txRequest.gasPrice = minBaseFee;
+          console.log("Wanchain: enforcing minimum gasPrice of 1 gwei");
+        } else if (feeData.maxFeePerGas) {
+          const maxFee = feeData.maxFeePerGas < minBaseFee ? minBaseFee : feeData.maxFeePerGas;
+          txRequest.gasPrice = maxFee;
+          console.log(`Wanchain: using gasPrice ${formatUnits(maxFee, "gwei")} gwei`);
+        }
+      }
+
+      if (opts.dryRun) {
+        console.log("[Dry Run] Transaction details:");
+        printJson({
+          from: wallet.address,
+          to: opts.to,
+          value: txRequest.value.toString(),
+          chainId: opts.chainId,
+        });
+        return;
+      }
+
+      console.log(`Sending ${opts.amount} native token to ${opts.to} on chain ${opts.chainId}...`);
+      const sentTx: TransactionResponse = await signer.sendTransaction(txRequest);
+      console.log(`Transaction hash: ${sentTx.hash}`);
+      console.log("Waiting for confirmation...");
+      const receipt = await sentTx.wait();
+      console.log(`Transaction confirmed in block ${receipt?.blockNumber}`);
+      console.log(`Gas used: ${receipt?.gasUsed.toString()}`);
+    } catch (e: any) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+  });
+
+// ── Transfer ERC20 token (same chain) ────────────────────────────────────────
+program
+  .command("transfer-token")
+  .description(
+    "Send ERC20 tokens on the same chain\n\n" +
+    "This is a simple same-chain ERC20 transfer, NOT a cross-chain bridge operation.\n\n" +
+    "Examples:\n" +
+    "  # Send 100 USDC on Ethereum (6 decimals)\n" +
+    "  xflows transfer-token --wallet alice --chain-id 1 \\\n" +
+    "    --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \\\n" +
+    "    --to 0xRecipient --amount 100 --decimals 6\n\n" +
+    "  # Send 50 USDT on BSC (auto-detect decimals)\n" +
+    "  xflows transfer-token --wallet alice --chain-id 56 \\\n" +
+    "    --token 0x55d398326f99059fF775485246999027B3197955 \\\n" +
+    "    --to 0xRecipient --amount 50"
+  )
+  .requiredOption("--wallet <name>", "Wallet name to use for signing")
+  .requiredOption("--chain-id <chainId>", "Chain ID to send on")
+  .requiredOption("--token <address>", "ERC20 token contract address")
+  .requiredOption("--to <address>", "Recipient address")
+  .requiredOption("--amount <amount>", "Amount to send (human-readable, e.g., 100)")
+  .option("--decimals <decimals>", "Token decimals (auto-detected from contract if omitted)")
+  .option("--password <password>", "Password to decrypt encrypted wallet")
+  .option("--rpc <url>", "Custom RPC URL (overrides default)")
+  .option("--gas-limit <limit>", "Custom gas limit")
+  .option("--dry-run", "Only build the transaction, don't send it", false)
+  .action(async (opts) => {
+    try {
+      const wallet = loadWallet(opts.wallet, opts.password);
+      const provider = opts.rpc ? new JsonRpcProvider(opts.rpc) : getProvider(opts.chainId);
+      const signer = wallet.connect(provider);
+
+      const tokenContract = new Contract(opts.token, ERC20_ABI, signer);
+
+      // Get decimals: use provided value or auto-detect from contract
+      let decimals: number;
+      if (opts.decimals !== undefined) {
+        decimals = Number(opts.decimals);
+      } else {
+        try {
+          decimals = Number(await tokenContract.decimals());
+          console.log(`Token decimals: ${decimals}`);
+        } catch {
+          throw new Error("Could not auto-detect token decimals. Please provide --decimals manually.");
+        }
+      }
+
+      // Get symbol for display
+      let symbol = "TOKEN";
+      try {
+        symbol = await tokenContract.symbol();
+      } catch {
+        // ignore, use default
+      }
+
+      const amount = parseUnits(opts.amount, decimals);
+
+      // Check balance
+      const balance = await tokenContract.balanceOf(wallet.address);
+      if (balance < amount) {
+        console.error(`Insufficient ${symbol} balance: ${formatUnits(balance, decimals)} < ${opts.amount}`);
+        process.exit(1);
+      }
+
+      if (opts.dryRun) {
+        console.log("[Dry Run] Transaction details:");
+        printJson({
+          from: wallet.address,
+          to: opts.to,
+          token: opts.token,
+          symbol,
+          amount: opts.amount,
+          amountWei: amount.toString(),
+          decimals,
+          chainId: opts.chainId,
+        });
+        return;
+      }
+
+      console.log(`Sending ${opts.amount} ${symbol} to ${opts.to} on chain ${opts.chainId}...`);
+
+      const txOverrides: any = {};
+      if (opts.gasLimit) {
+        txOverrides.gasLimit = BigInt(opts.gasLimit);
+      }
+
+      // Wanchain special handling
+      const isWanchain = opts.chainId === "888";
+      if (isWanchain) {
+        const feeData = await provider.getFeeData();
+        const minBaseFee = parseUnits("1", "gwei");
+        if (feeData.gasPrice && feeData.gasPrice < minBaseFee) {
+          txOverrides.gasPrice = minBaseFee;
+          console.log("Wanchain: enforcing minimum gasPrice of 1 gwei");
+        } else if (feeData.maxFeePerGas) {
+          const maxFee = feeData.maxFeePerGas < minBaseFee ? minBaseFee : feeData.maxFeePerGas;
+          txOverrides.gasPrice = maxFee;
+          console.log(`Wanchain: using gasPrice ${formatUnits(maxFee, "gwei")} gwei`);
+        }
+      }
+
+      const sentTx = await tokenContract.transfer(opts.to, amount, txOverrides);
+      console.log(`Transaction hash: ${sentTx.hash}`);
+      console.log("Waiting for confirmation...");
+      const receipt = await sentTx.wait();
+      console.log(`Transaction confirmed in block ${receipt?.blockNumber}`);
+      console.log(`Gas used: ${receipt?.gasUsed.toString()}`);
     } catch (e: any) {
       console.error(`Error: ${e.message}`);
       process.exit(1);

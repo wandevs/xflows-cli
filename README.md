@@ -18,6 +18,8 @@ A command-line interface for the [Wanchain XFlows](https://docs.wanchain.org/dev
   - [Query Commands](#query-commands)
   - [Quote](#quote)
   - [Send Transaction](#send-transaction)
+  - [Transfer (Native Token)](#transfer-native-token)
+  - [Transfer Token (ERC20)](#transfer-token-erc20)
   - [Transaction Status](#transaction-status)
   - [RPC List](#rpc-list)
 - [Complete Workflow Example](#complete-workflow-example)
@@ -510,6 +512,76 @@ xflows send \
 6. Signs with the local private key and broadcasts to the source chain RPC
 7. Waits for on-chain confirmation
 8. Prints the transaction hash and a ready-to-use `xflows status` command for tracking
+
+### Transfer (Native Token)
+
+Send native tokens (ETH, BNB, WAN, etc.) on the same chain. This is a simple transfer, not a cross-chain bridge operation.
+
+```bash
+# Send 0.1 ETH on Ethereum
+xflows transfer --wallet alice --chain-id 1 --to 0xRecipient --amount 0.1
+
+# Send 1.5 BNB on BSC with encrypted wallet
+xflows transfer --wallet alice --password mysecret --chain-id 56 --to 0xRecipient --amount 1.5
+
+# Dry run (preview without sending)
+xflows transfer --wallet alice --chain-id 1 --to 0xRecipient --amount 0.1 --dry-run
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--wallet <name>` | Yes | Wallet name to use for signing |
+| `--chain-id <id>` | Yes | Chain ID to send on |
+| `--to <address>` | Yes | Recipient address |
+| `--amount <amount>` | Yes | Amount to send (human-readable, e.g., `0.1`) |
+| `--password <pw>` | No | Password for encrypted wallet |
+| `--rpc <url>` | No | Override default RPC endpoint |
+| `--gas-limit <limit>` | No | Custom gas limit |
+| `--dry-run` | No | Build but do not send the transaction |
+
+### Transfer Token (ERC20)
+
+Send ERC20 tokens on the same chain. Token decimals are auto-detected from the contract, or can be specified manually.
+
+```bash
+# Send 100 USDC on Ethereum (auto-detect decimals)
+xflows transfer-token --wallet alice --chain-id 1 \
+  --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+  --to 0xRecipient --amount 100
+
+# Send with explicit decimals
+xflows transfer-token --wallet alice --chain-id 1 \
+  --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+  --to 0xRecipient --amount 100 --decimals 6
+
+# Send 50 USDT on BSC with encrypted wallet
+xflows transfer-token --wallet alice --password mysecret --chain-id 56 \
+  --token 0x55d398326f99059fF775485246999027B3197955 \
+  --to 0xRecipient --amount 50
+
+# Dry run (preview without sending)
+xflows transfer-token --wallet alice --chain-id 1 \
+  --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+  --to 0xRecipient --amount 100 --dry-run
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--wallet <name>` | Yes | Wallet name to use for signing |
+| `--chain-id <id>` | Yes | Chain ID to send on |
+| `--token <address>` | Yes | ERC20 token contract address |
+| `--to <address>` | Yes | Recipient address |
+| `--amount <amount>` | Yes | Amount to send (human-readable, e.g., `100`) |
+| `--decimals <n>` | No | Token decimals (auto-detected if omitted) |
+| `--password <pw>` | No | Password for encrypted wallet |
+| `--rpc <url>` | No | Override default RPC endpoint |
+| `--gas-limit <limit>` | No | Custom gas limit |
+| `--dry-run` | No | Build but do not send the transaction |
+
+**Features:**
+- Auto-detects token decimals and symbol from the contract
+- Checks token balance before sending to provide a clear error message
+- Supports Wanchain gas price enforcement
 
 ### Transaction Status
 
