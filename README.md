@@ -27,16 +27,40 @@ A command-line interface for the [Wanchain XFlows](https://docs.wanchain.org/dev
 
 ## Installation
 
+### From npm (recommended)
+
 ```bash
-# Clone and install dependencies
-bun install
+# Install globally via npm
+npm install -g xflows
 
-# Run directly
-bun src/index.ts --help
+# Or via yarn
+yarn global add xflows
 
-# Or link as a global command
-bun link
+# Or via pnpm
+pnpm add -g xflows
+
+# Then use it anywhere
 xflows --help
+```
+
+**Requirements:** Node.js >= 18
+
+### One-time use with npx
+
+```bash
+# Run without installing
+npx xflows --help
+npx xflows chains
+npx xflows wallet create --name alice
+```
+
+### From source
+
+```bash
+git clone https://github.com/wandevs/xflows-cli.git
+cd xflows-cli
+bun install
+bun src/index.ts --help
 ```
 
 **Requirements:** [Bun](https://bun.sh) v1.0+
