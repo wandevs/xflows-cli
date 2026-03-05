@@ -1,0 +1,51 @@
+{
+  "name": "xflows",
+  "version": "1.0.0",
+  "description": "CLI tool for Wanchain XFlows cross-chain bridge - wallet management, quote queries, and cross-chain transactions",
+  "type": "module",
+  "bin": {
+    "xflows": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outfile dist/index.js --target node --format esm && chmod +x dist/index.js",
+    "prepublishOnly": "bun run build",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "keywords": [
+    "wanchain",
+    "xflows",
+    "cross-chain",
+    "bridge",
+    "cli",
+    "defi",
+    "web3",
+    "evm",
+    "swap"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "ethers": "^6.16.0"
+  }
+}
