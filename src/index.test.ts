@@ -81,10 +81,14 @@ describe("Constants", () => {
     expect(RPC_MAP["56"]).toContain("publicnode.com");
   });
 
-  test("ERC20_ABI contains approve and allowance", () => {
-    expect(ERC20_ABI).toHaveLength(2);
-    expect(ERC20_ABI[0]).toContain("approve");
-    expect(ERC20_ABI[1]).toContain("allowance");
+  test("ERC20_ABI contains all required functions", () => {
+    expect(ERC20_ABI).toHaveLength(6);
+    expect(ERC20_ABI).toContain("function approve(address spender, uint256 amount) returns (bool)");
+    expect(ERC20_ABI).toContain("function allowance(address owner, address spender) view returns (uint256)");
+    expect(ERC20_ABI).toContain("function transfer(address to, uint256 amount) returns (bool)");
+    expect(ERC20_ABI).toContain("function balanceOf(address owner) view returns (uint256)");
+    expect(ERC20_ABI).toContain("function decimals() view returns (uint8)");
+    expect(ERC20_ABI).toContain("function symbol() view returns (string)");
   });
 });
 
@@ -682,6 +686,15 @@ describe("CLI integration", () => {
       expect(stdout).toContain("--chain-id");
       expect(stdout).toContain("--rpc");
     });
+
+    test("wallet token-balance --help shows options", async () => {
+      const { stdout } = await run("wallet token-balance --help");
+      expect(stdout).toContain("--name");
+      expect(stdout).toContain("--chain-id");
+      expect(stdout).toContain("--token");
+      expect(stdout).toContain("--decimals");
+      expect(stdout).toContain("--rpc");
+    });
   });
 
   describe("rpc", () => {
@@ -1214,6 +1227,85 @@ describe("CLI wallet balance", () => {
     const code = await exited;
     expect(code).not.toBe(0);
     expect(err).toContain("required");
+  }, 15000);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 15b. Wallet token-balance (CLI integration, live RPC)
+// ═══════════════════════════════════════════════════════════════════════════
+describe("CLI wallet token-balance", () => {
+  const CWD = "/Users/molin/workspace/temp/xflows";
+  const runArgs = (args: string[]) => {
+    const proc = Bun.spawn(["bun", "src/index.ts", ...args], {
+      cwd: CWD,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    return {
+      stdout: new Response(proc.stdout).text(),
+      stderr: new Response(proc.stderr).text(),
+      exited: proc.exited,
+    };
+  };
+
+  test("shows USDC balance on Ethereum mainnet (auto-detect decimals)", async () => {
+    const name = testWalletName();
+    const p = runArgs(["wallet", "create", "--name", name, "--private-key", TEST_PRIVATE_KEY]);
+    await p.exited;
+
+    // USDC on Ethereum
+    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const { stdout, exited } = runArgs(["wallet", "token-balance", "--name", name, "--chain-id", "1", "--token", token]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain("Address:");
+    expect(out).toContain("Token:   0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("shows USDT balance on BSC (with explicit decimals)", async () => {
+    const name = testWalletName();
+    const p = runArgs(["wallet", "create", "--name", name, "--private-key", TEST_PRIVATE_KEY]);
+    await p.exited;
+
+    // USDT on BSC (18 decimals)
+    const token = "0x55d398326f99059fF775485246999027B3197955";
+    const { stdout, exited } = runArgs(["wallet", "token-balance", "--name", name, "--chain-id", "56", "--token", token, "--decimals", "18"]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("token-balance with custom --rpc succeeds", async () => {
+    const name = testWalletName();
+    const p = runArgs(["wallet", "create", "--name", name, "--private-key", TEST_PRIVATE_KEY]);
+    await p.exited;
+
+    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const { stdout, exited } = runArgs([
+      "wallet", "token-balance", "--name", name,
+      "--chain-id", "1",
+      "--token", token,
+      "--rpc", "https://ethereum-rpc.publicnode.com",
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("token-balance missing --token shows error", async () => {
+    const name = testWalletName();
+    const p = runArgs(["wallet", "create", "--name", name]);
+    await p.exited;
+
+    const { stderr, exited } = runArgs(["wallet", "token-balance", "--name", name, "--chain-id", "1"]);
+    const err = await stderr;
+    const code = await exited;
+    expect(code).not.toBe(0);
+    expect(err).toContain("required option '--token <address>'");
   }, 15000);
 });
 

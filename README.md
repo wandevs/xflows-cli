@@ -15,6 +15,12 @@ A command-line interface for the [Wanchain XFlows](https://docs.wanchain.org/dev
   - [RPC Endpoints](#rpc-endpoints)
 - [Commands](#commands)
   - [Wallet Management](#wallet-management)
+    - [`wallet create`](#wallet-create----create-a-new-wallet)
+    - [`wallet list`](#wallet-list----list-all-saved-wallets)
+    - [`wallet show`](#wallet-show----show-wallet-details)
+    - [`wallet balance`](#wallet-balance----check-native-token-balance)
+    - [`wallet token-balance`](#wallet-token-balance----check-erc20-token-balance)
+    - [`wallet delete`](#wallet-delete----delete-a-wallet)
   - [Query Commands](#query-commands)
   - [Quote](#quote)
   - [Send Transaction](#send-transaction)
@@ -332,6 +338,32 @@ xflows wallet balance --name alice --chain-id 1 --rpc https://my-rpc.example.com
 |------|----------|-------------|
 | `--name <name>` | Yes | Wallet name |
 | `--chain-id <id>` | Yes | Chain ID to query balance on |
+| `--password <pw>` | No | Password for encrypted wallets |
+| `--rpc <url>` | No | Override default RPC endpoint |
+
+#### `wallet token-balance` -- Check ERC20 token balance
+
+```bash
+# Check USDC balance on Ethereum
+xflows wallet token-balance --name alice --chain-id 1 \
+  --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+
+# Check USDT balance on BSC (auto-detect decimals)
+xflows wallet token-balance --name alice --chain-id 56 \
+  --token 0x55d398326f99059fF775485246999027B3197955
+
+# Check with explicit decimals and custom RPC
+xflows wallet token-balance --name alice --chain-id 1 \
+  --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
+  --decimals 6 --rpc https://my-rpc.example.com
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--name <name>` | Yes | Wallet name |
+| `--chain-id <id>` | Yes | Chain ID to query balance on |
+| `--token <addr>` | Yes | ERC20 token contract address |
+| `--decimals <n>` | No | Token decimals (auto-detected if omitted) |
 | `--password <pw>` | No | Password for encrypted wallets |
 | `--rpc <url>` | No | Override default RPC endpoint |
 

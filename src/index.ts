@@ -310,6 +310,59 @@ walletCmd
   });
 
 walletCmd
+  .command("token-balance")
+  .description(
+    "Check ERC20 token balance on a specific chain\n\n" +
+    "Examples:\n" +
+    "  # Check USDC balance on Ethereum\n" +
+    "  xflows wallet token-balance --name alice --chain-id 1 \\\n" +
+    "    --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\n\n" +
+    "  # Check USDT balance on BSC with explicit decimals\n" +
+    "  xflows wallet token-balance --name alice --chain-id 56 \\\n" +
+    "    --token 0x55d398326f99059fF775485246999027B3197955 --decimals 18"
+  )
+  .requiredOption("--name <name>", "Wallet name")
+  .requiredOption("--chain-id <chainId>", "Chain ID to check balance on")
+  .requiredOption("--token <address>", "ERC20 token contract address")
+  .option("--decimals <decimals>", "Token decimals (auto-detected if omitted)")
+  .option("--password <password>", "Password to decrypt encrypted wallet")
+  .option("--rpc <url>", "Custom RPC URL (overrides default)")
+  .action(async (opts) => {
+    try {
+      const wallet = loadWallet(opts.name, opts.password);
+      const provider = opts.rpc ? new JsonRpcProvider(opts.rpc) : getProvider(opts.chainId);
+      const tokenContract = new Contract(opts.token, ERC20_ABI, provider);
+
+      let decimals: number;
+      if (opts.decimals !== undefined) {
+        decimals = Number(opts.decimals);
+      } else {
+        try {
+          decimals = Number(await tokenContract.decimals());
+        } catch {
+          throw new Error("Could not auto-detect token decimals. Please provide --decimals manually.");
+        }
+      }
+
+      let symbol = "TOKEN";
+      try {
+        symbol = await tokenContract.symbol();
+      } catch {
+        // ignore
+      }
+
+      const balance = await tokenContract.balanceOf(wallet.address);
+      console.log(`Address: ${wallet.address}`);
+      console.log(`Chain:   ${opts.chainId}`);
+      console.log(`Token:   ${opts.token} (${symbol})`);
+      console.log(`Balance: ${formatUnits(balance, decimals)}`);
+    } catch (e: any) {
+      console.error(`Error: ${e.message}`);
+      process.exit(1);
+    }
+  });
+
+walletCmd
   .command("delete")
   .description("Delete a saved wallet")
   .requiredOption("--name <name>", "Wallet name to delete")
