@@ -82,6 +82,16 @@ export async function apiPost(endpoint: string, body: Record<string, any>) {
   return resp.json();
 }
 
+// ── Response unwrapper ──────────────────────────────────────────────────────
+// The XFlows API wraps all responses in {success, data}. This extracts .data
+// when present, so callers can access fields directly.
+export function unwrapResponse(resp: any): any {
+  if (resp && resp.success === true && resp.data !== undefined) {
+    return resp.data;
+  }
+  return resp;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 export function getWalletDir(): string {
   const dir = path.join(process.env.HOME || "~", ".xflows", "wallets");
@@ -119,7 +129,8 @@ export function getProvider(chainId: string): JsonRpcProvider {
 }
 
 export function printJson(data: any) {
-  console.log(JSON.stringify(data, null, 2));
+  console.log(JSON.stringify(data, (_key, value) =>
+    typeof value === "bigint" ? value.toString() : value, 2));
 }
 
 export const ERC20_ABI = [
@@ -508,7 +519,8 @@ program
 
       // Step 1: Get quote first to check for errors and show estimate
       console.log("Fetching quote...");
-      const quote = await apiPost("/quote", body);
+      const quoteResp = await apiPost("/quote", body);
+      const quote = unwrapResponse(quoteResp);
       if (quote.error) {
         console.error(`Quote error: ${quote.error}`);
         process.exit(1);
@@ -531,7 +543,8 @@ program
 
       // Step 2: Build transaction
       console.log("\nBuilding transaction...");
-      const buildResult = await apiPost("/buildTx", body);
+      const buildResp = await apiPost("/buildTx", body);
+      const buildResult = unwrapResponse(buildResp);
 
       if (buildResult.error) {
         console.error(`Build error: ${buildResult.error}`);
@@ -542,7 +555,7 @@ program
       if (!tx) {
         console.error("No transaction data returned from API.");
         console.log("Full response:");
-        printJson(buildResult);
+        printJson(buildResp);
         process.exit(1);
       }
 
@@ -664,8 +677,8 @@ program
     if (opts.bridge) body.bridge = opts.bridge;
 
     const queryStatus = async () => {
-      const data = await apiPost("/status", body);
-      return data;
+      const resp = await apiPost("/status", body);
+      return unwrapResponse(resp);
     };
 
     if (!opts.poll) {

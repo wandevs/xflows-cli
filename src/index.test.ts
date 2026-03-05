@@ -16,6 +16,7 @@ import {
   API_BASE,
   VERSION,
   ERC20_ABI,
+  unwrapResponse,
 } from "./index";
 
 // ── Test fixtures ───────────────────────────────────────────────────────────
@@ -84,6 +85,59 @@ describe("Constants", () => {
     expect(ERC20_ABI).toHaveLength(2);
     expect(ERC20_ABI[0]).toContain("approve");
     expect(ERC20_ABI[1]).toContain("allowance");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 1b. unwrapResponse
+// ═══════════════════════════════════════════════════════════════════════════
+describe("unwrapResponse", () => {
+  test("unwraps {success: true, data: ...} envelope", () => {
+    const resp = { success: true, data: { amountOut: "1.0", workMode: 1 } };
+    const result = unwrapResponse(resp);
+    expect(result.amountOut).toBe("1.0");
+    expect(result.workMode).toBe(1);
+  });
+
+  test("unwraps nested tx object", () => {
+    const resp = { success: true, data: { chainId: 888, tx: { to: "0xABC", data: "0x123", value: "100" } } };
+    const result = unwrapResponse(resp);
+    expect(result.tx.to).toBe("0xABC");
+    expect(result.tx.value).toBe("100");
+  });
+
+  test("unwraps array data", () => {
+    const resp = { success: true, data: [{ chainId: "1" }, { chainId: "56" }] };
+    const result = unwrapResponse(resp);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+  });
+
+  test("returns raw response when no success/data envelope", () => {
+    const resp = { error: "something went wrong" };
+    const result = unwrapResponse(resp);
+    expect(result.error).toBe("something went wrong");
+  });
+
+  test("returns raw response when success is false", () => {
+    const resp = { success: false, error: "bad request" };
+    const result = unwrapResponse(resp);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("bad request");
+  });
+
+  test("handles null input", () => {
+    expect(unwrapResponse(null)).toBeNull();
+  });
+
+  test("handles undefined input", () => {
+    expect(unwrapResponse(undefined)).toBeUndefined();
+  });
+
+  test("handles data: null (valid envelope)", () => {
+    const resp = { success: true, data: null };
+    // data is null, so it returns null
+    expect(unwrapResponse(resp)).toBeNull();
   });
 });
 
@@ -826,7 +880,7 @@ describe("API live smoke tests", () => {
     expect(exitCode).toBe(0);
     const parsed = JSON.parse(stdout);
     expect(parsed.data).toBeInstanceOf(Array);
-  });
+  }, 30000);
 
   test("CLI dexes command returns valid JSON", async () => {
     const proc = Bun.spawn(["bun", "src/index.ts", "dexes"], {
