@@ -5,9 +5,10 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
+import pkg from "../package.json";
 
 export const API_BASE = "https://xflows.wanchain.org/api/v3";
-export const VERSION = "1.0.0";
+export const VERSION = pkg.version;
 
 // ── RPC endpoints (publicnode.com where available) ──────────────────────────
 export const RPC_MAP: Record<string, string> = {
