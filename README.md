@@ -327,6 +327,9 @@ xflows wallet balance --name alice --chain-id 56
 # Check WAN balance on Wanchain
 xflows wallet balance --name alice --chain-id 888
 
+# Check any address (no wallet needed)
+xflows wallet balance --address 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 --chain-id 1
+
 # Encrypted wallet
 xflows wallet balance --name alice --chain-id 1 --password mypassword
 
@@ -336,7 +339,8 @@ xflows wallet balance --name alice --chain-id 1 --rpc https://my-rpc.example.com
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--name <name>` | Yes | Wallet name |
+| `--name <name>` | One of `--name` or `--address` | Wallet name |
+| `--address <addr>` | One of `--name` or `--address` | Query any address (no wallet needed) |
 | `--chain-id <id>` | Yes | Chain ID to query balance on |
 | `--password <pw>` | No | Password for encrypted wallets |
 | `--rpc <url>` | No | Override default RPC endpoint |
@@ -352,6 +356,10 @@ xflows wallet token-balance --name alice --chain-id 1 \
 xflows wallet token-balance --name alice --chain-id 56 \
   --token 0x55d398326f99059fF775485246999027B3197955
 
+# Check any address's USDC balance (no wallet needed)
+xflows wallet token-balance --address 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 \
+  --chain-id 1 --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
+
 # Check with explicit decimals and custom RPC
 xflows wallet token-balance --name alice --chain-id 1 \
   --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48 \
@@ -360,7 +368,8 @@ xflows wallet token-balance --name alice --chain-id 1 \
 
 | Flag | Required | Description |
 |------|----------|-------------|
-| `--name <name>` | Yes | Wallet name |
+| `--name <name>` | One of `--name` or `--address` | Wallet name |
+| `--address <addr>` | One of `--name` or `--address` | Query any address (no wallet needed) |
 | `--chain-id <id>` | Yes | Chain ID to query balance on |
 | `--token <addr>` | Yes | ERC20 token contract address |
 | `--decimals <n>` | No | Token decimals (auto-detected if omitted) |

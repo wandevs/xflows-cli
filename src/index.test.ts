@@ -1228,6 +1228,69 @@ describe("CLI wallet balance", () => {
     expect(code).not.toBe(0);
     expect(err).toContain("required");
   }, 15000);
+
+  test("balance with --address queries any address without wallet", async () => {
+    const { stdout, exited } = runArgs([
+      "wallet", "balance",
+      "--address", TEST_ADDRESS,
+      "--chain-id", "1",
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain(`Address: ${TEST_ADDRESS}`);
+    expect(out).toContain("Chain:   1");
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("balance with --address on BSC succeeds", async () => {
+    const { stdout, exited } = runArgs([
+      "wallet", "balance",
+      "--address", TEST_ADDRESS,
+      "--chain-id", "56",
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain("Chain:   56");
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("balance with invalid --address fails", async () => {
+    const { stderr, exited } = runArgs([
+      "wallet", "balance",
+      "--address", "0xinvalid",
+      "--chain-id", "1",
+    ]);
+    const err = await stderr;
+    const code = await exited;
+    expect(code).not.toBe(0);
+    expect(err).toContain("Invalid address");
+  }, 15000);
+
+  test("balance without --name or --address fails", async () => {
+    const { stderr, exited } = runArgs([
+      "wallet", "balance",
+      "--chain-id", "1",
+    ]);
+    const err = await stderr;
+    const code = await exited;
+    expect(code).not.toBe(0);
+    expect(err).toContain("--name or --address");
+  }, 15000);
+
+  test("balance --address ignores --name when both provided", async () => {
+    const { stdout, exited } = runArgs([
+      "wallet", "balance",
+      "--address", TEST_ADDRESS,
+      "--name", "nonexistent_wallet",
+      "--chain-id", "1",
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain(`Address: ${TEST_ADDRESS}`);
+  }, 30000);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1306,6 +1369,64 @@ describe("CLI wallet token-balance", () => {
     const code = await exited;
     expect(code).not.toBe(0);
     expect(err).toContain("required option '--token <address>'");
+  }, 15000);
+
+  test("token-balance with --address queries any address without wallet", async () => {
+    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"; // USDC on Ethereum
+    const { stdout, exited } = runArgs([
+      "wallet", "token-balance",
+      "--address", TEST_ADDRESS,
+      "--chain-id", "1",
+      "--token", token,
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain(`Address: ${TEST_ADDRESS}`);
+    expect(out).toContain(`Token:   ${token}`);
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("token-balance with --address and explicit decimals succeeds", async () => {
+    const token = "0x55d398326f99059fF775485246999027B3197955"; // USDT on BSC
+    const { stdout, exited } = runArgs([
+      "wallet", "token-balance",
+      "--address", TEST_ADDRESS,
+      "--chain-id", "56",
+      "--token", token,
+      "--decimals", "18",
+    ]);
+    const out = await stdout;
+    const code = await exited;
+    expect(code).toBe(0);
+    expect(out).toContain("Balance:");
+  }, 30000);
+
+  test("token-balance with invalid --address fails", async () => {
+    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const { stderr, exited } = runArgs([
+      "wallet", "token-balance",
+      "--address", "not_an_address",
+      "--chain-id", "1",
+      "--token", token,
+    ]);
+    const err = await stderr;
+    const code = await exited;
+    expect(code).not.toBe(0);
+    expect(err).toContain("Invalid address");
+  }, 15000);
+
+  test("token-balance without --name or --address fails", async () => {
+    const token = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const { stderr, exited } = runArgs([
+      "wallet", "token-balance",
+      "--chain-id", "1",
+      "--token", token,
+    ]);
+    const err = await stderr;
+    const code = await exited;
+    expect(code).not.toBe(0);
+    expect(err).toContain("--name or --address");
   }, 15000);
 });
 

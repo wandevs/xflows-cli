@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { Wallet, JsonRpcProvider, parseUnits, formatUnits, parseEther, Contract, type TransactionResponse } from "ethers";
+import { Wallet, JsonRpcProvider, parseUnits, formatUnits, parseEther, Contract, isAddress, type TransactionResponse } from "ethers";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
@@ -289,18 +289,32 @@ walletCmd
     "Check native token balance on a specific chain\n\n" +
     "Examples:\n" +
     "  xflows wallet balance --name myWallet --chain-id 1\n" +
-    "  xflows wallet balance --name myWallet --chain-id 56 --password mysecret"
+    "  xflows wallet balance --name myWallet --chain-id 56 --password mysecret\n" +
+    "  xflows wallet balance --address 0x1234...abcd --chain-id 1"
   )
-  .requiredOption("--name <name>", "Wallet name")
+  .option("--name <name>", "Wallet name")
+  .option("--address <address>", "Query balance for any address (no wallet needed)")
   .requiredOption("--chain-id <chainId>", "Chain ID to check balance on")
   .option("--password <password>", "Password to decrypt encrypted wallet")
   .option("--rpc <url>", "Custom RPC URL (overrides default)")
   .action(async (opts) => {
     try {
-      const wallet = loadWallet(opts.name, opts.password);
+      if (!opts.name && !opts.address) {
+        throw new Error("Please provide either --name or --address");
+      }
+      let targetAddress: string;
+      if (opts.address) {
+        if (!isAddress(opts.address)) {
+          throw new Error(`Invalid address: ${opts.address}`);
+        }
+        targetAddress = opts.address;
+      } else {
+        const wallet = loadWallet(opts.name, opts.password);
+        targetAddress = wallet.address;
+      }
       const provider = opts.rpc ? new JsonRpcProvider(opts.rpc) : getProvider(opts.chainId);
-      const balance = await provider.getBalance(wallet.address);
-      console.log(`Address: ${wallet.address}`);
+      const balance = await provider.getBalance(targetAddress);
+      console.log(`Address: ${targetAddress}`);
       console.log(`Chain:   ${opts.chainId}`);
       console.log(`Balance: ${formatUnits(balance, 18)} (native token)`);
     } catch (e: any) {
@@ -319,9 +333,13 @@ walletCmd
     "    --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48\n\n" +
     "  # Check USDT balance on BSC with explicit decimals\n" +
     "  xflows wallet token-balance --name alice --chain-id 56 \\\n" +
-    "    --token 0x55d398326f99059fF775485246999027B3197955 --decimals 18"
+    "    --token 0x55d398326f99059fF775485246999027B3197955 --decimals 18\n\n" +
+    "  # Check any address's USDC balance (no wallet needed)\n" +
+    "  xflows wallet token-balance --address 0x1234...abcd --chain-id 1 \\\n" +
+    "    --token 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
   )
-  .requiredOption("--name <name>", "Wallet name")
+  .option("--name <name>", "Wallet name")
+  .option("--address <address>", "Query balance for any address (no wallet needed)")
   .requiredOption("--chain-id <chainId>", "Chain ID to check balance on")
   .requiredOption("--token <address>", "ERC20 token contract address")
   .option("--decimals <decimals>", "Token decimals (auto-detected if omitted)")
@@ -329,7 +347,19 @@ walletCmd
   .option("--rpc <url>", "Custom RPC URL (overrides default)")
   .action(async (opts) => {
     try {
-      const wallet = loadWallet(opts.name, opts.password);
+      if (!opts.name && !opts.address) {
+        throw new Error("Please provide either --name or --address");
+      }
+      let targetAddress: string;
+      if (opts.address) {
+        if (!isAddress(opts.address)) {
+          throw new Error(`Invalid address: ${opts.address}`);
+        }
+        targetAddress = opts.address;
+      } else {
+        const wallet = loadWallet(opts.name, opts.password);
+        targetAddress = wallet.address;
+      }
       const provider = opts.rpc ? new JsonRpcProvider(opts.rpc) : getProvider(opts.chainId);
       const tokenContract = new Contract(opts.token, ERC20_ABI, provider);
 
@@ -351,8 +381,8 @@ walletCmd
         // ignore
       }
 
-      const balance = await tokenContract.balanceOf(wallet.address);
-      console.log(`Address: ${wallet.address}`);
+      const balance = await tokenContract.balanceOf(targetAddress);
+      console.log(`Address: ${targetAddress}`);
       console.log(`Chain:   ${opts.chainId}`);
       console.log(`Token:   ${opts.token} (${symbol})`);
       console.log(`Balance: ${formatUnits(balance, decimals)}`);
