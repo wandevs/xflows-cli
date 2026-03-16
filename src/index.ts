@@ -651,32 +651,33 @@ program
 
       // Step 3: Handle ERC20 approval if needed
       const NATIVE_ADDRESS = "0x0000000000000000000000000000000000000000";
+      const spender = tx.approvalAddress || tx.to;
       if (
         opts.fromToken.toLowerCase() !== NATIVE_ADDRESS &&
-        tx.approvalAddress
+        spender
       ) {
-        console.log(`\nChecking token approval for ${tx.approvalAddress}...`);
+        console.log(`\nChecking token approval for ${spender}...`);
         const tokenContract = new Contract(opts.fromToken, ERC20_ABI, signer);
-        const currentAllowance = await tokenContract.allowance(wallet.address, tx.approvalAddress);
+        const currentAllowance = await tokenContract.allowance(wallet.address, spender);
         const decimals = await tokenContract.decimals();
         const requiredAmount = parseUnits(opts.amount, decimals);
 
         if (currentAllowance < requiredAmount) {
-          console.log(`Approving ${opts.amount} tokens for ${tx.approvalAddress}...`);
+          console.log(`Approving ${opts.amount} tokens for ${spender}...`);
 
           // Estimate gas first; if it fails, reset allowance to 0 then retry
           // (some tokens like USDT require allowance to be 0 before changing)
           try {
-            await tokenContract.approve.estimateGas(tx.approvalAddress, requiredAmount);
+            await tokenContract.approve.estimateGas(spender, requiredAmount);
           } catch {
             console.log("Approve estimate failed, resetting allowance to 0 first...");
-            const resetTx = await tokenContract.approve(tx.approvalAddress, 0n);
+            const resetTx = await tokenContract.approve(spender, 0n);
             console.log(`Reset tx: ${resetTx.hash}`);
             await resetTx.wait();
             console.log("Allowance reset to 0.");
           }
 
-          const approveTx = await tokenContract.approve(tx.approvalAddress, requiredAmount);
+          const approveTx = await tokenContract.approve(spender, requiredAmount);
           console.log(`Approval tx: ${approveTx.hash}`);
           await approveTx.wait();
           console.log("Approval confirmed.");
