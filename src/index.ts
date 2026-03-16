@@ -658,12 +658,25 @@ program
         console.log(`\nChecking token approval for ${tx.approvalAddress}...`);
         const tokenContract = new Contract(opts.fromToken, ERC20_ABI, signer);
         const currentAllowance = await tokenContract.allowance(wallet.address, tx.approvalAddress);
-        const requiredAmount = BigInt(tx.value || 0) > 0n ? BigInt(tx.value) : parseUnits(opts.amount, 18);
+        const decimals = await tokenContract.decimals();
+        const requiredAmount = parseUnits(opts.amount, decimals);
 
         if (currentAllowance < requiredAmount) {
-          console.log("Approving token spend...");
-          const maxApproval = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-          const approveTx = await tokenContract.approve(tx.approvalAddress, maxApproval);
+          console.log(`Approving ${opts.amount} tokens for ${tx.approvalAddress}...`);
+
+          // Estimate gas first; if it fails, reset allowance to 0 then retry
+          // (some tokens like USDT require allowance to be 0 before changing)
+          try {
+            await tokenContract.approve.estimateGas(tx.approvalAddress, requiredAmount);
+          } catch {
+            console.log("Approve estimate failed, resetting allowance to 0 first...");
+            const resetTx = await tokenContract.approve(tx.approvalAddress, 0n);
+            console.log(`Reset tx: ${resetTx.hash}`);
+            await resetTx.wait();
+            console.log("Allowance reset to 0.");
+          }
+
+          const approveTx = await tokenContract.approve(tx.approvalAddress, requiredAmount);
           console.log(`Approval tx: ${approveTx.hash}`);
           await approveTx.wait();
           console.log("Approval confirmed.");
