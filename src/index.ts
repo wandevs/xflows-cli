@@ -621,13 +621,19 @@ program
       if (quote.nativeFees?.length) {
         console.log(`Native fees:`);
         for (const f of quote.nativeFees) {
-          console.log(`  ${f.amount} ${f.symbol}`);
+          const amount = f.nativeFeeAmount ?? f.amount;
+          const symbol = f.nativeFeeSymbol ?? f.symbol;
+          const decimals = f.nativeFeeDecimals ?? f.decimals ?? 18;
+          console.log(`  ${formatUnits(amount, decimals)} ${symbol}`);
         }
       }
       if (quote.tokenFees?.length) {
         console.log(`Token fees:`);
         for (const f of quote.tokenFees) {
-          console.log(`  ${f.amount} ${f.symbol}`);
+          const amount = f.tokenFeeAmount ?? f.amount;
+          const symbol = f.tokenFeeSymbol ?? f.symbol;
+          const decimals = f.tokenFeeDecimals ?? f.decimals ?? 18;
+          console.log(`  ${formatUnits(amount, decimals)} ${symbol}`);
         }
       }
 
@@ -719,7 +725,26 @@ program
         return;
       }
 
-      console.log("\nSending transaction...");
+      // Estimate gas to catch errors before sending
+      console.log("\nEstimating gas...");
+      try {
+        const estimatedGas = await provider.estimateGas({
+          ...txRequest,
+          from: wallet.address,
+        });
+        if (!txRequest.gasLimit) {
+          // Add 20% buffer to estimated gas
+          txRequest.gasLimit = estimatedGas * 120n / 100n;
+        }
+        console.log(`Estimated gas: ${estimatedGas.toString()}`);
+      } catch (err: any) {
+        const reason = err.reason || err.shortMessage || err.message;
+        console.error(`\nTransaction will fail: ${reason}`);
+        console.error("The transaction was NOT sent.");
+        process.exit(1);
+      }
+
+      console.log("Sending transaction...");
       const sentTx: TransactionResponse = await signer.sendTransaction(txRequest);
       console.log(`Transaction hash: ${sentTx.hash}`);
       console.log("Waiting for confirmation...");
