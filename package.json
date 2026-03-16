@@ -1,6 +1,6 @@
 {
   "name": "xflows",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "description": "CLI tool for Wanchain XFlows cross-chain bridge - wallet management, quote queries, and cross-chain transactions",
   "type": "module",
   "bin": {
