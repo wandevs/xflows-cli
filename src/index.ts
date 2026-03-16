@@ -726,22 +726,29 @@ program
       }
 
       // Estimate gas to catch errors before sending
-      console.log("\nEstimating gas...");
-      try {
-        const estimatedGas = await provider.estimateGas({
-          ...txRequest,
-          from: wallet.address,
-        });
-        if (!txRequest.gasLimit) {
-          // Add 20% buffer to estimated gas
+      if (opts.gasLimit) {
+        console.log(`\nUsing manual gas limit: ${opts.gasLimit}`);
+      } else {
+        console.log("\nEstimating gas...");
+        try {
+          const estimatedGas = await provider.estimateGas({
+            ...txRequest,
+            from: wallet.address,
+          });
           txRequest.gasLimit = estimatedGas * 120n / 100n;
+          console.log(`Estimated gas: ${estimatedGas.toString()}`);
+        } catch (err: any) {
+          const reason = err.reason || err.shortMessage || err.message;
+          console.error(`\nTransaction will fail: ${reason}`);
+          if (!err.reason || err.reason === "require(false)") {
+            console.error("Hint: The contract reverted without a reason. This may indicate:");
+            console.error("  - The bridge storeman group is temporarily unavailable");
+            console.error("  - The token pair or route is not supported at this time");
+            console.error("  - Insufficient token balance for the requested amount");
+          }
+          console.error("The transaction was NOT sent. Use --gas-limit to force send.");
+          process.exit(1);
         }
-        console.log(`Estimated gas: ${estimatedGas.toString()}`);
-      } catch (err: any) {
-        const reason = err.reason || err.shortMessage || err.message;
-        console.error(`\nTransaction will fail: ${reason}`);
-        console.error("The transaction was NOT sent.");
-        process.exit(1);
       }
 
       console.log("Sending transaction...");
